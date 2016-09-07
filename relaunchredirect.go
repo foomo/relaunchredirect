@@ -55,6 +55,10 @@ func (r *Redirect) ShouldRedirect(req *http.Request) bool {
 	}
 	// host
 	if len(r.ForceHost) > 0 {
+		forwardedHost, ok := req.Header["X-Forwarded-Host"]
+		if ok && len(forwardedHost) == 1 && len(forwardedHost[0]) > 0 {
+			return forwardedHost[0] != r.ForceHost
+		}
 		return req.URL.Host != r.ForceHost
 	}
 	return false
