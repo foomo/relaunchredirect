@@ -3,6 +3,10 @@
 Helps with redirects, when relaunching a website:
 
 - redirects paths through a map lookup
+- redirects paths through a regex map lookup
+- can force lower case only
+- can force trailing slash
+- can force no trailing slash
 - can force a domain
 - can force TLS
 
@@ -17,16 +21,30 @@ r := relaunchredirect.NewRedirect()
 // force tls
 r.ForceTLS = true
 
+// force lower case
+r.ForceLowerCase = true
+
+// force no or trailing slash
+r.ForceTrailingSlash = true
+// r.ForceNoTrailingSlash = true
+
 // force a host
 r.ForceHost = "example.com"
 
 // set a redirect programatically
 r.Redirects["/from"] = "/to"
 
-// load redirects from a CSV
-csvLoadErr := r.LoadRedirects("/path/to/my/redirects.csv")
-if csvLoadErr == nil {
-	panic(csvLoadErr)
+// append redirects from a CSV
+if err := r.AppendRedirects("/path/to/my/redirects.csv") er != nil {
+	panic(err)
+}
+
+// set a redirect programatically
+r.RegexRedirects["^/from/(.*)"] = "/to/$1"
+
+// append regex redirects from a CSV
+if err := r.AppendRegexRedirects("/path/to/my/regex-redirects.csv"); er != nil {
+	panic(err)
 }
 
 ```

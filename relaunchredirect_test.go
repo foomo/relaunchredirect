@@ -51,7 +51,14 @@ func TestRedirects(t *testing.T) {
 	expect(runTest(r, "http://foo.com/ok"), http.StatusOK, "200", t)
 }
 
-func TestLoadRedirects(t *testing.T) {
+func TestRegexRedirects(t *testing.T) {
+	r := NewRedirect()
+	r.RegexRedirects["^/foo/(.*)"] = "/$1"
+	expect(runTest(r, "http://foo.com/foo/bar"), http.StatusMovedPermanently, "redirect /bar", t)
+	expect(runTest(r, "http://foo.com/ok"), http.StatusOK, "200", t)
+}
+
+func TestAppendRedirects(t *testing.T) {
 	r := NewRedirect()
 	err := r.AppendRedirects("c://file/no/have")
 	if err == nil {
@@ -61,7 +68,18 @@ func TestLoadRedirects(t *testing.T) {
 	if err != nil {
 		t.Fatal("csv loading should have worked")
 	}
+}
 
+func TestAppendRegexRedirects(t *testing.T) {
+	r := NewRedirect()
+	err := r.AppendRegexRedirects("c://file/no/have")
+	if err == nil {
+		t.Fatal("that should have failed")
+	}
+	err = r.AppendRegexRedirects(path.Join(GetCurrentDir(), "regex_redirects_example.csv"))
+	if err != nil {
+		t.Fatal("csv loading should have worked")
+	}
 }
 
 func TestForceTLS(t *testing.T) {
@@ -69,4 +87,29 @@ func TestForceTLS(t *testing.T) {
 	expect(runTest(r, "http://foo.com/ok"), http.StatusOK, "200", t)
 	r.ForceTLS = true
 	expect(runTest(r, "http://foo.com/ok"), http.StatusMovedPermanently, "tls redirect", t)
+}
+
+func TestForceLowerCase(t *testing.T) {
+	r := NewRedirect()
+	expect(runTest(r, "http://foo.com/Foo"), http.StatusOK, "200", t)
+	r.ForceLowerCase = true
+	expect(runTest(r, "http://foo.com/Foo"), http.StatusMovedPermanently, "lower case redirect", t)
+}
+
+func TestForceNoTrailingSlashes(t *testing.T) {
+	r := NewRedirect()
+	expect(runTest(r, "http://foo.com/"), http.StatusOK, "200", t)
+	expect(runTest(r, "http://foo.com/foo"), http.StatusOK, "200", t)
+	r.ForceTrailingSlash = true
+	expect(runTest(r, "http://foo.com/"), http.StatusOK, "200", t)
+	expect(runTest(r, "http://foo.com/foo"), http.StatusMovedPermanently, "trailing slashes redirect", t)
+}
+
+func TestForceTrailingSlashes(t *testing.T) {
+	r := NewRedirect()
+	expect(runTest(r, "http://foo.com/"), http.StatusOK, "200", t)
+	expect(runTest(r, "http://foo.com/foo/"), http.StatusOK, "200", t)
+	r.ForceNoTrailingSlash = true
+	expect(runTest(r, "http://foo.com/"), http.StatusOK, "200", t)
+	expect(runTest(r, "http://foo.com/foo/"), http.StatusMovedPermanently, "no trailing slashes redirect", t)
 }
