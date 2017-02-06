@@ -11,13 +11,16 @@ import (
 )
 
 type Redirect struct {
-	ForceHost            string
-	ForceTLS             bool
-	ForceLowerCase       bool
-	ForceTrailingSlash   bool
-	ForceNoTrailingSlash bool
-	Redirects            map[string]string
-	RegexRedirects       map[string]string
+	ForceHost                  string
+	ForceTLS                   bool
+	ForceLowerCase             bool
+	ForceLowerCaseIgnore       string
+	ForceTrailingSlash         bool
+	ForceTrailingSlashIgnore   string
+	ForceNoTrailingSlash       bool
+	ForceNoTrailingSlashIgnore string
+	Redirects                  map[string]string
+	RegexRedirects             map[string]string
 }
 
 // NewRedirect constructs a new Redirect
@@ -63,15 +66,18 @@ func (r *Redirect) ShouldRedirect(req *http.Request) bool {
 		}
 	}
 
-	// case i.e. http://foo.com/Some/URL > http://foo.com/Some/URL
-	if r.ForceLowerCase && strings.ToLower(req.URL.Path) != req.URL.Path {
+	// Lower case
+	if r.shouldRedirectLowerCase(req) {
 		return true
 	}
 
-	// trailing slash i.e. http://foo.com/some/url/ > http://foo.com/some/url
-	if r.ForceTrailingSlash && req.URL.Path != "/" && req.URL.Path[len(req.URL.Path)-1:] != "/" {
+	// Trailing slash
+	if r.shouldRedirectTrailingSlash(req) {
 		return true
-	} else if r.ForceNoTrailingSlash && req.URL.Path != "/" && req.URL.Path[len(req.URL.Path)-1:] == "/" {
+	}
+
+	// No trailing slash
+	if r.shouldRedirectNoTrailingSlash(req) {
 		return true
 	}
 
@@ -96,6 +102,8 @@ func (r *Redirect) ShouldRedirect(req *http.Request) bool {
 	return false
 }
 
+
+
 func (r *Redirect) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// copy old url
 	newURL, err := url.Parse(req.URL.String())
@@ -105,25 +113,25 @@ func (r *Redirect) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// tls i.e. http://foo.com > https://foo.com
+	// TLS
 	if r.ForceTLS {
 		newURL.Scheme = "https"
 	}
 
-	// host i.e. foo.com > www.foo.com
+	// Host
 	if len(r.ForceHost) > 0 {
 		newURL.Host = r.ForceHost
 	}
 
-	// case i.e. http://foo.com/Some/URL > http://foo.com/Some/URL
-	if r.ForceLowerCase {
+	// Lower case
+	if r.shouldRedirectLowerCase(req) {
 		newURL.Path = strings.ToLower(newURL.Path)
 	}
 
-	// trailing slash i.e. http://foo.com/some/url/ > http://foo.com/some/url
-	if r.ForceTrailingSlash && req.URL.Path != "/" && req.URL.Path[len(req.URL.Path)-1:] != "/" {
+	// No / trailing slash
+	if r.shouldRedirectTrailingSlash(req) {
 		newURL.Path = newURL.Path + "/"
-	} else if r.ForceNoTrailingSlash && req.URL.Path != "/" && req.URL.Path[len(req.URL.Path)-1:] == "/" {
+	} else if r.shouldRedirectNoTrailingSlash(req) {
 		newURL.Path = newURL.Path[0 : len(req.URL.Path)-1]
 	}
 
@@ -155,6 +163,10 @@ func (r *Redirect) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // appendCSV load redirects with rules from a CSV File
 func (r *Redirect) appendCSV(csvFile string, target map[string]string) error {
+	if len(csvFile) == 0 {
+		return nil
+	}
+
 	f, err := os.Open(csvFile)
 	if err != nil {
 		return err
@@ -172,4 +184,54 @@ func (r *Redirect) appendCSV(csvFile string, target map[string]string) error {
 		target[lineArray[0]] = lineArray[1]
 	}
 	return nil
+}
+
+// shouldRedirectLowerCase i.e. http://foo.com/Some/URL > http://foo.com/Some/url
+func (r *Redirect) shouldRedirectLowerCase(req *http.Request) bool {
+	if r.ForceLowerCase {
+		ignore := false
+		if len(r.ForceLowerCaseIgnore) > 0 {
+			if regex, err := regexp.Compile(r.ForceLowerCaseIgnore); err == nil && regex.MatchString(req.URL.Path) {
+				ignore = true
+			}
+		}
+		if !ignore && strings.ToLower(req.URL.Path) != req.URL.Path {
+			return true
+		}
+	}
+	return false
+}
+
+// shouldRedirectTrailingSlash returns true if trailing slash redirect is required
+// i.e. http://foo.com/some/url > http://foo.com/some/url/
+func (r *Redirect) shouldRedirectTrailingSlash(req *http.Request) bool {
+	if r.ForceTrailingSlash && req.URL.Path != "/" {
+		ignore := false
+		if len(r.ForceTrailingSlashIgnore) > 0 {
+			if regex, err := regexp.Compile(r.ForceTrailingSlashIgnore); err == nil && regex.MatchString(req.URL.Path) {
+				ignore = true
+			}
+		}
+		if !ignore && req.URL.Path[len(req.URL.Path)-1:] != "/" {
+			return true
+		}
+	}
+	return false
+}
+
+// shouldRedirectNoTrailingSlash returns true if no trailing slash redirect is required
+// i.e. http://foo.com/some/url/ > http://foo.com/some/url
+func (r *Redirect) shouldRedirectNoTrailingSlash(req *http.Request) bool {
+	if r.ForceNoTrailingSlash && req.URL.Path != "/" {
+		ignore := false
+		if len(r.ForceNoTrailingSlashIgnore) > 0 {
+			if regex, err := regexp.Compile(r.ForceNoTrailingSlashIgnore); err == nil && regex.MatchString(req.URL.Path) {
+				ignore = true
+			}
+		}
+		if !ignore && req.URL.Path[len(req.URL.Path)-1:] == "/" {
+			return true
+		}
+	}
+	return false
 }

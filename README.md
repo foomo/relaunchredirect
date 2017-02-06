@@ -23,10 +23,13 @@ r.ForceTLS = true
 
 // force lower case
 r.ForceLowerCase = true
+r.ForceLowerCaseIgnore = "^/ignore/(.*)"
 
 // force no or trailing slash
 r.ForceTrailingSlash = true
+r.ForceTrailingSlashIgnore = "^/ignore/(.*)"
 // r.ForceNoTrailingSlash = true
+// r.ForceNoTrailingSlashIgnore = "^/ignore/(.*)"
 
 // force a host
 r.ForceHost = "example.com"
